@@ -4,14 +4,12 @@ import numpy as np
 import pandas as pd
 from natsort import natsorted
 
-from scipy.spatial.distance import pdist, squareform
-
 from nilearn.image import load_img
 from rsatoolbox.model.model import ModelFixed
 from rsatoolbox.data.dataset import Dataset
 from rsatoolbox.inference.evaluate import eval_dual_bootstrap
 from rsatoolbox.rdm.calc import calc_rdm_unbalanced
-from rsatoolbox.rdm.rdms import concat
+from rsatoolbox.rdm.rdms import concat, load_rdm
 from rsatoolbox.vis import plot_model_comparison
 
 import matplotlib.pyplot as plt
@@ -20,6 +18,7 @@ import seaborn as sns
 # I/O
 sub_list = ["01", "02", "03", "04", "06", "10", "14", "15", "16", "17", "18", "19", "20"]
 orientations = ["frontal", "left", "right"]
+eye_fpath = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks"
 
 out_dir_roi = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/roi-results/"
 if not os.path.exists(out_dir_roi):
@@ -34,7 +33,7 @@ rdm_list = []
 lut_fpath = "/home/exp-psy/Desktop/study_face_tracks/derivatives/fmriprep_native/desc-aparcaseg_dseg.tsv"
 lut_df = pd.read_csv(lut_fpath, sep="\t")
 
-# Same labels = 0, left/right = 0.5, others = 1
+# create dist. matrix values
 def custom_distance(x, y):
     if x == y:
         return 0
@@ -42,7 +41,6 @@ def custom_distance(x, y):
         return 0.5
     else:
         return 1
-
 
 # define lists of labels to keep
 cortical_rois = [f"ctx-{h}-{region}" for h in ["lh", "rh"] for region in [
@@ -122,7 +120,7 @@ for roi in filtered_data["name"]:
         conditions = [path.split("/")[-1].split("_")[2].split("-")[1] for path in nifti_fpaths]
         runs = [path.split("/")[-1].split("_")[1].split("-")[1] for path in nifti_fpaths]
 
-        # Create distance matrix
+        # create distance matrix
         print("creating hypothesis matrices ...")
         orientation_matrix = np.zeros((len(orientations), len(orientations)))
 
@@ -166,15 +164,10 @@ for roi in filtered_data["name"]:
 
     # combine datasets and save it
     data_rdms = concat(rdm_list)
+    # data_rdms.save(os.path.join(out_dir_nRDM, f"roi-{roi}"))
 
-    # from rsatoolbox.vis import show_rdm
-
-    # fig, _, _ = show_rdm(data_rdms, show_colorbar='panel')
-    # plt.show()
-    data_rdms.save(os.path.join(out_dir_nRDM, f"roi-{roi}"))
-
-    models_in = [orientation_matrix]
-    model_names = ["orientation"]
+    models_in = [orientation_matrix, load_rdm(os.path.join(eye_fpath, "general_eye-RDM.hdf5"))]
+    model_names = ["orientation", "eye_map"]
     models_comp = []
 
     for model, model_name in zip(models_in, model_names):
