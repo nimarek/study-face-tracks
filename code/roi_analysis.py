@@ -19,6 +19,7 @@ import seaborn as sns
 sub_list = ["01", "02", "03", "04", "06", "10", "14", "15", "16", "17", "18", "19", "20"]
 orientations = ["frontal", "left", "right"]
 eye_fpath = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks"
+vis_fpath = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/visual_properties"
 
 out_dir_roi = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/roi-results/"
 if not os.path.exists(out_dir_roi):
@@ -45,25 +46,28 @@ def custom_distance(x, y):
 # define lists of labels to keep
 cortical_rois = [f"ctx-{h}-{region}" for h in ["lh", "rh"] for region in [
     "bankssts", "caudalanteriorcingulate", "caudalmiddlefrontal", "cuneus",
-    "entorhinal", "fusiform", "inferiorparietal", "inferiortemporal",
-    "insula", "isthmuscingulate", "lateraloccipital", "lateralorbitofrontal",
-    "lingual", "medialorbitofrontal", "middletemporal", "parahippocampal",
-    "paracentral", "parsopercularis", "parsorbitalis", "parstriangularis",
-    "pericalcarine", "postcentral", "posteriorcingulate", "precentral",
-    "precuneus", "rostralanteriorcingulate", "rostralmiddlefrontal",
-    "superiorfrontal", "superiorparietal", "superiortemporal",
-    "supramarginal", "frontalpole", "temporalpole", "transversetemporal"
+    "entorhinal", "fusiform", "inferiorparietal", "inferiortemporal", "insula",
+    "isthmuscingulate", "lateraloccipital", "lateralorbitofrontal", "lingual",
+    "medialorbitofrontal", "middletemporal", "parahippocampal", "paracentral",
+    "parsopercularis", "parsorbitalis", "parstriangularis", "pericalcarine",
+    "postcentral", "posteriorcingulate", "precentral", "precuneus",
+    "rostralanteriorcingulate", "rostralmiddlefrontal", "superiorfrontal",
+    "superiorparietal", "superiortemporal", "supramarginal", "frontalpole",
+    "temporalpole", "transversetemporal", "V1", "V2", "V3", "V4", "MT",
+    "MST", "LO", "LIP", "VIP", "FEF", "PPC", "SPL", "IPL", "IFG", "DLPFC",
+    "ACC", "PCC", "SMA", "PMC", "TPJ"
 ]]
 
 subcortical_rois = [
-    "Left-Thalamus-Proper", "Right-Thalamus-Proper",
-    "Left-Caudate", "Right-Caudate",
-    "Left-Putamen", "Right-Putamen",
-    "Left-Pallidum", "Right-Pallidum",
-    "Left-Hippocampus", "Right-Hippocampus",
-    "Left-Amygdala", "Right-Amygdala",
-    "Left-Accumbens-area", "Right-Accumbens-area"
+    "Left-Thalamus-Proper", "Right-Thalamus-Proper", "Left-Caudate", "Right-Caudate",
+    "Left-Putamen", "Right-Putamen", "Left-Pallidum", "Right-Pallidum",
+    "Left-Hippocampus", "Right-Hippocampus", "Left-Amygdala", "Right-Amygdala",
+    "Left-Accumbens-area", "Right-Accumbens-area", "Left-VentralDC", "Right-VentralDC",
+    "Brain-Stem", "Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex",
+    "Left-Cerebellum-White-Matter", "Right-Cerebellum-White-Matter",
+    "Subthalamic-Nucleus", "Zona-Incerta", "Red-Nucleus", "Substantia-Nigra"
 ]
+
 
 # combine cortical and subcortical ROIs
 rois_of_interest = cortical_rois + subcortical_rois
@@ -105,7 +109,7 @@ for roi in filtered_data["name"]:
                     "Desktop", 
                     "study_face_tracks", 
                     "derivatives", 
-                    f"lss_native_smooth-3_face-tracks", 
+                    "lss_native_smooth-3_face-tracks", 
                     f"sub-{sub}", 
                     f"sub-{sub}_run-*_contrast-*.nii.gz")
             )
@@ -166,8 +170,11 @@ for roi in filtered_data["name"]:
     data_rdms = concat(rdm_list)
     # data_rdms.save(os.path.join(out_dir_nRDM, f"roi-{roi}"))
 
-    models_in = [orientation_matrix, load_rdm(os.path.join(eye_fpath, "general_eye-RDM.hdf5"))]
-    model_names = ["orientation", "eye_map"]
+    models_in = [orientation_matrix, 
+                 load_rdm(os.path.join(eye_fpath, "general_eye-RDM.hdf5")), 
+                 load_rdm(os.path.join(vis_fpath, "visual-RDM.hdf5"))]
+    
+    model_names = ["face orientation", "FDM", "image similarity"]
     models_comp = []
 
     for model, model_name in zip(models_in, model_names):
