@@ -95,7 +95,7 @@ for roi in filtered_data["name"]:
         
         aparc_data = load_img(aparc_fpath).get_fdata()
 
-        # create bilateral roi
+        # create roi from surface reconstruction
         target_mask = np.zeros_like(aparc_data, dtype=bool)
         target_mask[aparc_data == float(match_index)] = True
         roi_size = target_mask.sum()
