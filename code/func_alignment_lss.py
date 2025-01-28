@@ -1,5 +1,5 @@
 import os
-import glob 
+import sys
 import json
 import pandas as pd
 import numpy as np
@@ -9,12 +9,13 @@ from nltools.file_reader import onsets_to_dm
 from nltools.stats import align, zscore
 
 # I/O
+sub = str(sys.argv[1])
 all_data = []
 target_run, train_run = 1, 7
 sub_list = ["01", "02", "03", "04", "06", "10", "14", "15", "16", "17", "18", "19", "20"]
-event_file = "/home/exp-psy/Desktop/study_face_tracks/derivatives/reference_face-tracks/studyf_run-01_face-orientation.csv"
-deriv_dir = "/home/exp-psy/Desktop/study_face_tracks/derivatives/"
-lut_df = pd.read_csv("/home/exp-psy/Desktop/study_face_tracks/derivatives/fmriprep_mni/desc-aparcaseg_dseg.tsv", sep="\t")
+event_file = "/home/data/study_gaze_tracks/code/reference_face-tracks/studyf_run-01_face-orientation.csv"
+deriv_dir = "/home/data/study_gaze_tracks/scratch/local_code/derivatives"
+lut_df = pd.read_csv("/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives/desc-aparcaseg_dseg.tsv", sep="\t")
 
 # select columes to slice bold data
 if target_run == 1:
@@ -72,26 +73,24 @@ def reorder_columns(df):
 # define lists of labels to keep
 cortical_rois = [f"ctx-{h}-{region}" for h in ["lh", "rh"] for region in [
     "bankssts", "caudalanteriorcingulate", "caudalmiddlefrontal", "cuneus",
-    "entorhinal", "fusiform", "inferiorparietal", "inferiortemporal", "insula",
-    "isthmuscingulate", "lateraloccipital", "lateralorbitofrontal", "lingual",
-    "medialorbitofrontal", "middletemporal", "parahippocampal", "paracentral",
-    "parsopercularis", "parsorbitalis", "parstriangularis", "pericalcarine",
-    "postcentral", "posteriorcingulate", "precentral", "precuneus",
-    "rostralanteriorcingulate", "rostralmiddlefrontal", "superiorfrontal",
-    "superiorparietal", "superiortemporal", "supramarginal", "frontalpole",
-    "temporalpole", "transversetemporal", "V1", "V2", "V3", "V4", "MT",
-    "MST", "LO", "LIP", "VIP", "FEF", "PPC", "SPL", "IPL", "IFG", "DLPFC",
-    "ACC", "PCC", "SMA", "PMC", "TPJ"
+    "entorhinal", "fusiform", "inferiorparietal", "inferiortemporal",
+    "insula", "isthmuscingulate", "lateraloccipital", "lateralorbitofrontal",
+    "lingual", "medialorbitofrontal", "middletemporal", "parahippocampal",
+    "paracentral", "parsopercularis", "parsorbitalis", "parstriangularis",
+    "pericalcarine", "postcentral", "posteriorcingulate", "precentral",
+    "precuneus", "rostralanteriorcingulate", "rostralmiddlefrontal",
+    "superiorfrontal", "superiorparietal", "superiortemporal",
+    "supramarginal", "frontalpole", "temporalpole", "transversetemporal"
 ]]
 
 subcortical_rois = [
-    "Left-Thalamus-Proper", "Right-Thalamus-Proper", "Left-Caudate", "Right-Caudate",
-    "Left-Putamen", "Right-Putamen", "Left-Pallidum", "Right-Pallidum",
-    "Left-Hippocampus", "Right-Hippocampus", "Left-Amygdala", "Right-Amygdala",
-    "Left-Accumbens-area", "Right-Accumbens-area", "Left-VentralDC", "Right-VentralDC",
-    "Brain-Stem", "Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex",
-    "Left-Cerebellum-White-Matter", "Right-Cerebellum-White-Matter",
-    "Subthalamic-Nucleus", "Zona-Incerta", "Red-Nucleus", "Substantia-Nigra"
+    "Left-Thalamus-Proper", "Right-Thalamus-Proper",
+    "Left-Caudate", "Right-Caudate",
+    "Left-Putamen", "Right-Putamen",
+    "Left-Pallidum", "Right-Pallidum",
+    "Left-Hippocampus", "Right-Hippocampus",
+    "Left-Amygdala", "Right-Amygdala",
+    "Left-Accumbens-area", "Right-Accumbens-area"
 ]
 
 # combine cortical and subcortical ROIs
@@ -104,18 +103,13 @@ for roi in filtered_data["name"]:
     match_index = matches["index"].values[0]
 
     # start loading data
-    for sub in sub_list:
+    for sub_train in sub_list:
         aparc_fpath = os.path.join(
-            "/home", 
-            "exp-psy", 
-            "Desktop", 
-            "study_face_tracks", 
-            "derivatives", 
-            "fmriprep_mni",
-            f"sub-{sub}", 
+            "/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives",
+            f"sub-{sub_train}", 
             "ses-movie", 
             "func", 
-            f"sub-{sub}_ses-movie_task-movie_run-{train_run}_space-MNI152NLin2009cAsym_res-2_desc-aparcaseg_dseg.nii.gz"
+            f"sub-{sub_train}_ses-movie_task-movie_run-{train_run}_space-MNI152NLin2009cAsym_res-2_desc-aparcaseg_dseg.nii.gz"
         )
         affine = nib.load(aparc_fpath).affine 
         aparc_data = nib.load(aparc_fpath).get_fdata()
@@ -126,16 +120,11 @@ for roi in filtered_data["name"]:
         roi_mask = nib.nifti1.Nifti1Image(target_mask*1.0, affine=affine)
             
         func_f = os.path.join(
-            "/home", 
-            "exp-psy", 
-            "Desktop", 
-            "study_face_tracks", 
-            "derivatives", 
-            "fmriprep_mni",
-            f"sub-{sub}", 
+            "/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives",
+            f"sub-{sub_train}", 
             "ses-movie", 
             "func", 
-            f"sub-{sub}_ses-movie_task-movie_run-{train_run}_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz"
+            f"sub-{sub_train}_ses-movie_task-movie_run-{train_run}_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz"
             )
         data = Brain_Data(slicer(func_f, train_volumes), mask=roi_mask)
         all_data.append(data)
@@ -144,92 +133,82 @@ for roi in filtered_data["name"]:
     hyperalign = align(all_data, method="procrustes")
 
     # start least-square separate estimation
-    for sub in sub_list:
-        print(f"extracting data from subject: {sub}")
-        aparc_fpath = os.path.join(
-        "/home", 
-        "exp-psy", 
-        "Desktop", 
-        "study_face_tracks", 
-        "derivatives", 
-        "fmriprep_mni",
-        f"sub-{sub}", 
-        "ses-movie", 
-        "func", 
-        f"sub-{sub}_ses-movie_task-movie_run-{target_run}_space-MNI152NLin2009cAsym_res-2_desc-aparcaseg_dseg.nii.gz"
-        )
+    print(f"extracting data from subject: {sub}")
+    aparc_fpath = os.path.join(
+    "/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives",
+    f"sub-{sub}", 
+    "ses-movie", 
+    "func", 
+    f"sub-{sub}_ses-movie_task-movie_run-{target_run}_space-MNI152NLin2009cAsym_res-2_desc-aparcaseg_dseg.nii.gz"
+    )
 
-        func_f = os.path.join(
-        "/home", 
-        "exp-psy", 
-        "Desktop", 
-        "study_face_tracks", 
-        "derivatives", 
-        "fmriprep_mni",
-        f"sub-{sub}", 
-        "ses-movie", 
-        "func", 
-        f"sub-{sub}_ses-movie_task-movie_run-{target_run}_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz"
-        )
+    func_f = os.path.join(
+    "/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives",
+    f"sub-{sub}", 
+    "ses-movie", 
+    "func", 
+    f"sub-{sub}_ses-movie_task-movie_run-{target_run}_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz"
+    )
 
-        # create output folder
-        out_dir = os.path.join(deriv_dir, "hyperalignment", f"sub-{sub}", f"roi-{roi}")
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir, exist_ok=True)
+    # create output folder
+    out_dir = os.path.join(deriv_dir, "hyperalignment", f"sub-{sub}", f"roi-{roi}")
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
 
-        affine = nib.load(aparc_fpath).affine 
-        aparc_data = nib.load(aparc_fpath).get_fdata()
+    affine = nib.load(aparc_fpath).affine 
+    aparc_data = nib.load(aparc_fpath).get_fdata()
 
-        # create roi from surface reconstruction
-        target_mask = np.zeros_like(aparc_data, dtype=bool)
-        target_mask[aparc_data == float(match_index)] = True
-        roi_mask = nib.nifti1.Nifti1Image(target_mask*1.0, affine=affine)
+    # create roi from surface reconstruction
+    target_mask = np.zeros_like(aparc_data, dtype=bool)
+    target_mask[aparc_data == float(match_index)] = True
+    roi_mask = nib.nifti1.Nifti1Image(target_mask*1.0, affine=affine)
 
-        # load target data
-        target_data = Brain_Data(func_f, mask=roi_mask)
-        print("volumes available:\t", len(target_data))
+    # load target data
+    target_data = Brain_Data(func_f, mask=roi_mask)
+    print("volumes available:\t", len(target_data))
 
-        # align sub. to common space
-        aligned_sub_hyperalignment = target_data.align(hyperalign["common_model"], method="procrustes")
+    # align sub. to common space
+    aligned_sub_hyperalignment = target_data.align(hyperalign["common_model"], method="procrustes")
 
-        # get events, confounds, hyperparameters ...
-        events = pd.read_csv(event_file, sep=",")
-        events = events.rename(
-            columns={"onset": "Onset", "duration": "Duration", "trial_type": "Stim"}
-        )
-        events = events[["Onset", "Duration", "Stim"]]
-        events = events[events["Stim"].str.count("frontal|right|left") == 1]
+    # get events, confounds, hyperparameters ...
+    events = pd.read_csv(event_file, sep=",")
+    events = events.rename(
+        columns={"onset": "Onset", "duration": "Duration", "trial_type": "Stim"}
+    )
+    events = events[["Onset", "Duration", "Stim"]]
+    events = events[events["Stim"].str.count("frontal|right|left") == 1]
 
-        conf_file = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/fmriprep_native/sub-{sub}/ses-movie/func/sub-{sub}_ses-movie_task-movie_run-{target_run}_desc-confounds_timeseries.tsv"
-        confounds = pd.read_csv(conf_file, sep="\t")[conf_keep_list]
+    conf_file = f"/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives/sub-{sub}/ses-movie/func/sub-{sub}_ses-movie_task-movie_run-{target_run}_desc-confounds_timeseries.tsv"
+    confounds = pd.read_csv(conf_file, sep="\t")[conf_keep_list]
 
-        json_file = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/fmriprep_native/sub-{sub}/ses-movie/func/sub-{sub}_ses-movie_task-movie_run-{target_run}_space-T1w_desc-preproc_bold.json"
-        with open(json_file, "r") as f:
-            metadata = json.load(f)
-        TR = metadata.get("RepetitionTime", None)
-        print(f"TR: {TR}")
+    json_file = f"/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives/sub-{sub}/ses-movie/func/sub-{sub}_ses-movie_task-movie_run-{target_run}_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.json"
+    with open(json_file, "r") as f:
+        metadata = json.load(f)
+    TR = metadata.get("RepetitionTime", None)
+    print(f"TR: {TR}")
 
-        cov_dm = make_motion_covariates(confounds, TR)
-        confounds_add = pd.read_csv(conf_file, sep="\t")[conf_add_list]
-        cov_add_dm = Design_Matrix(confounds_add, sampling_freq=1/TR)
+    cov_dm = make_motion_covariates(confounds, TR)
+    confounds_add = pd.read_csv(conf_file, sep="\t")[conf_add_list]
+    cov_add_dm = Design_Matrix(confounds_add, sampling_freq=1/TR)
 
-        for i, row in events.iterrows():
-            lss_df = events.copy()
-            trial_type = row["Stim"]
-            print("working on stimulus:\t", trial_type)
-            lss_df["Stim"] = lss_df["Stim"].apply(lambda x: x if x == row["Stim"] else "other")
-            dm = onsets_to_dm(lss_df, 1/TR, train_volumes)
-            dm_conv = dm.convolve()
-            dm_conv_filt = dm_conv.add_dct_basis(duration=128)
-            dm_conv_filt_poly = dm_conv_filt.add_poly(order=2, include_lower=True)
-            dm_conv_filt_poly_cov = pd.concat([dm_conv_filt_poly, cov_dm, cov_add_dm], axis=1)
-            dm_conv_filt_poly_cov_ordered = reorder_columns(dm_conv_filt_poly_cov)
+    for i, row in events.iterrows():
+        lss_df = events.copy()
+        trial_type = row["Stim"]
+        print("working on stimulus:\t", trial_type)
+        lss_df["Stim"] = lss_df["Stim"].apply(lambda x: x if x == row["Stim"] else "other")
+        dm = onsets_to_dm(lss_df, 1/TR, train_volumes)
+        dm_conv = dm.convolve()
+        dm_conv_filt = dm_conv.add_dct_basis(duration=128)
+        dm_conv_filt_poly = dm_conv_filt.add_poly(order=2, include_lower=True)
+        dm_conv_filt_poly_cov = pd.concat([dm_conv_filt_poly, cov_dm, cov_add_dm], axis=1)
+        dm_conv_filt_poly_cov_ordered = reorder_columns(dm_conv_filt_poly_cov)
 
-            # diagnosis
-            # print(dm_conv_filt_poly_cov_ordered.columns)
-            # dm_conv_filt_poly_cov_ordered.heatmap(cmap="RdBu_r", vmin=-1,vmax=1)
-            
-            smoothed = aligned_sub_hyperalignment["transformed"].smooth(fwhm=3)
-            smoothed.X = dm_conv_filt_poly_cov
-            stats = smoothed.regress()
-            stats["t"][0].write(os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}.nii.gz"))
+        # diagnosis
+        # print(dm_conv_filt_poly_cov_ordered.columns)
+        # dm_conv_filt_poly_cov_ordered.heatmap(cmap="RdBu_r", vmin=-1,vmax=1)
+        
+        smoothed = aligned_sub_hyperalignment["transformed"].smooth(fwhm=2)
+        smoothed.X = dm_conv_filt_poly_cov
+        stats = smoothed.regress()
+        stats["t"][0].write(os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}_t-map.nii.gz"))
+        stats["beta"][0].write(os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}_beta-map.nii.gz"))
