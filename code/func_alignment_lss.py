@@ -13,9 +13,9 @@ sub = str(sys.argv[1])
 all_data = []
 target_run, train_run = 1, 7
 sub_list = ["01", "02", "03", "04", "06", "10", "14", "15", "16", "17", "18", "19", "20"]
-event_file = "/home/data/study_gaze_tracks/code/reference_face-tracks/studyf_run-01_face-orientation.csv"
-deriv_dir = "/home/data/study_gaze_tracks/scratch/local_code/derivatives"
-lut_df = pd.read_csv("/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives/desc-aparcaseg_dseg.tsv", sep="\t")
+event_file = "/home/exp-psy/Desktop/study_face_tracks/derivatives/reference_face-tracks/studyf_run-01_face-orientation.csv"
+deriv_dir = "/home/exp-psy/Desktop/study_face_tracks/derivatives/"
+lut_df = pd.read_csv("/home/exp-psy/Desktop/study_face_tracks/derivatives/fmriprep_mni/desc-aparcaseg_dseg.tsv", sep="\t")
 
 # select columes to slice bold data
 if target_run == 1:
@@ -105,7 +105,12 @@ for roi in filtered_data["name"]:
     # start loading data
     for sub_train in sub_list:
         aparc_fpath = os.path.join(
-            "/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives",
+            "/home", 
+            "exp-psy", 
+            "Desktop", 
+            "study_face_tracks", 
+            "derivatives", 
+            "fmriprep_mni",
             f"sub-{sub_train}", 
             "ses-movie", 
             "func", 
@@ -120,7 +125,12 @@ for roi in filtered_data["name"]:
         roi_mask = nib.nifti1.Nifti1Image(target_mask*1.0, affine=affine)
             
         func_f = os.path.join(
-            "/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives",
+            "/home", 
+            "exp-psy", 
+            "Desktop", 
+            "study_face_tracks", 
+            "derivatives", 
+            "fmriprep_mni",
             f"sub-{sub_train}", 
             "ses-movie", 
             "func", 
@@ -135,7 +145,12 @@ for roi in filtered_data["name"]:
     # start least-square separate estimation
     print(f"extracting data from subject: {sub}")
     aparc_fpath = os.path.join(
-    "/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives",
+    "/home", 
+    "exp-psy", 
+    "Desktop", 
+    "study_face_tracks", 
+    "derivatives", 
+    "fmriprep_mni",
     f"sub-{sub}", 
     "ses-movie", 
     "func", 
@@ -143,7 +158,12 @@ for roi in filtered_data["name"]:
     )
 
     func_f = os.path.join(
-    "/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives",
+    "/home", 
+    "exp-psy", 
+    "Desktop", 
+    "study_face_tracks", 
+    "derivatives", 
+    "fmriprep_mni",
     f"sub-{sub}", 
     "ses-movie", 
     "func", 
@@ -178,10 +198,10 @@ for roi in filtered_data["name"]:
     events = events[["Onset", "Duration", "Stim"]]
     events = events[events["Stim"].str.count("frontal|right|left") == 1]
 
-    conf_file = f"/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives/sub-{sub}/ses-movie/func/sub-{sub}_ses-movie_task-movie_run-{target_run}_desc-confounds_timeseries.tsv"
+    conf_file = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/fmriprep_mni/sub-{sub}/ses-movie/func/sub-{sub}_ses-movie_task-movie_run-{target_run}_desc-confounds_timeseries.tsv"
     confounds = pd.read_csv(conf_file, sep="\t")[conf_keep_list]
 
-    json_file = f"/home/data/study_gaze_tracks/studyforrest-data-phase2/derivatives/sub-{sub}/ses-movie/func/sub-{sub}_ses-movie_task-movie_run-{target_run}_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.json"
+    json_file = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/fmriprep_mni/sub-{sub}/ses-movie/func/sub-{sub}_ses-movie_task-movie_run-{target_run}_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.json"
     with open(json_file, "r") as f:
         metadata = json.load(f)
     TR = metadata.get("RepetitionTime", None)
@@ -194,6 +214,17 @@ for roi in filtered_data["name"]:
     for i, row in events.iterrows():
         lss_df = events.copy()
         trial_type = row["Stim"]
+
+        out_fname_t = os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}_t-map.nii.gz")
+        if os.path.exists(out_fname_t):
+            print(f"path exists: {out_fname_t}")
+            continue
+        
+        out_fname_beta = os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}_beta-map.nii.gz")
+        if os.path.exists(out_fname_beta):
+            print(f"path exists: {out_fname_beta}")
+            continue
+
         print("working on stimulus:\t", trial_type)
         lss_df["Stim"] = lss_df["Stim"].apply(lambda x: x if x == row["Stim"] else "other")
         dm = onsets_to_dm(lss_df, 1/TR, train_volumes)
@@ -207,8 +238,8 @@ for roi in filtered_data["name"]:
         # print(dm_conv_filt_poly_cov_ordered.columns)
         # dm_conv_filt_poly_cov_ordered.heatmap(cmap="RdBu_r", vmin=-1,vmax=1)
         
-        smoothed = aligned_sub_hyperalignment["transformed"].smooth(fwhm=2)
+        smoothed = aligned_sub_hyperalignment["transformed"].smooth(fwhm=3)
         smoothed.X = dm_conv_filt_poly_cov
         stats = smoothed.regress()
-        stats["t"][0].write(os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}_t-map.nii.gz"))
-        stats["beta"][0].write(os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}_beta-map.nii.gz"))
+        stats["t"][0].write(out_fname_t)
+        stats["beta"][0].write(out_fname_beta)
