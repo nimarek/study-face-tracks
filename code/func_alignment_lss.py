@@ -102,6 +102,14 @@ for roi in filtered_data["name"]:
     matches = lut_df[lut_df["name"] == roi]
     match_index = matches["index"].values[0]
 
+    # create output folder
+    out_dir = os.path.join(deriv_dir, "hyperalignment", f"sub-{sub}", f"roi-{roi}")
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
+    else:
+        print(f"path exists: {out_dir}")
+        continue
+
     # start loading data
     for sub_train in sub_list:
         aparc_fpath = os.path.join(
@@ -170,11 +178,6 @@ for roi in filtered_data["name"]:
     f"sub-{sub}_ses-movie_task-movie_run-{target_run}_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz"
     )
 
-    # create output folder
-    out_dir = os.path.join(deriv_dir, "hyperalignment", f"sub-{sub}", f"roi-{roi}")
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir, exist_ok=True)
-
     affine = nib.load(aparc_fpath).affine 
     aparc_data = nib.load(aparc_fpath).get_fdata()
 
@@ -215,17 +218,11 @@ for roi in filtered_data["name"]:
         lss_df = events.copy()
         trial_type = row["Stim"]
 
-        out_fname_t = os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}_t-map.nii.gz")
-        if os.path.exists(out_fname_t):
-            print(f"path exists: {out_fname_t}")
-            continue
-        
+        out_fname_t = os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}_t-map.nii.gz")        
         out_fname_beta = os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}_beta-map.nii.gz")
-        if os.path.exists(out_fname_beta):
-            print(f"path exists: {out_fname_beta}")
-            continue
 
         print("working on stimulus:\t", trial_type)
+        
         lss_df["Stim"] = lss_df["Stim"].apply(lambda x: x if x == row["Stim"] else "other")
         dm = onsets_to_dm(lss_df, 1/TR, train_volumes)
         dm_conv = dm.convolve()
