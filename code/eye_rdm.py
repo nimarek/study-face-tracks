@@ -2,6 +2,7 @@ import os
 import glob
 import numpy as np
 import pandas as pd
+from sklearn.utils import resample
 from scipy.ndimage import gaussian_filter
 from rsatoolbox.data.dataset import Dataset
 from rsatoolbox.rdm.calc import calc_rdm_unbalanced
@@ -12,13 +13,13 @@ import matplotlib.pyplot as plt
 
 # housekeeping
 sigma = 0
+resample_rate = 250
 eye_raw_dir = os.path.join("/home/exp-psy/Desktop/study_face_tracks", "derivatives", "fix_maps")
 rdm_list = []
 
 # Lists for subjects, runs, and chunks
 chunk_list = [0, 59, 68, 55, 71, 54, 68, 83, 51]
 sub_list = ["01", "02", "03", "04", "05", "06", "09", "10", "14", "15", "16", "17", "18", "19", "20"]
-# run_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
 run_list = ["01"]
 
 # helper functions
@@ -106,6 +107,19 @@ def plot_norm_data(sub, run, chunk, chunk_data, sigma=None, output_path="/home/e
     plt.close()
     return hist.flatten()
 
+def downsample(chunked_df, resample_to=250):
+    """
+    Convert pandas df to numpy arrays and mask all nan values and remove from dataframe.
+    """
+    raw_x, raw_y = chunked_df["x"], chunked_df["y"]
+    pros_x, pros_y = raw_x[~np.isnan(raw_x)], raw_y[~np.isnan(raw_y)]
+
+    if pros_x.size == 0:
+        res_x, res_y = [0], [0]
+    else:
+        res_x, res_y = resample(pros_x, replace=True, n_samples=resample_to, random_state=0), resample(pros_y, replace=True, n_samples=resample_to, random_state=0)
+    return np.concatenate((res_x, res_y), axis=None)
+
 for sub in sub_list:
     output_dir = create_dirs(sub)
     exa_df = load_split(sub, root_dir=eye_raw_dir)
@@ -114,22 +128,25 @@ for sub in sub_list:
         steps_list, event_labels = load_events(run)
         print(f"Processing sub-{sub} run-{run}: {len(steps_list)} chunks")
 
-        # initialize an empty arr
-        patterns = np.full([len(steps_list), 698880], np.nan)
+        # initialize empty arrays
+        spatial_patterns, time_patterns = np.full([len(steps_list), 698880], np.nan), np.full([len(steps_list), 600], np.nan)
 
         for chunk_num, ((start_frame, end_frame), label) in enumerate(zip(steps_list, event_labels), start=1):
             print(f"Chunk-{chunk_num}; Start frame: {start_frame}, End frame: {end_frame}")
             
-            # Extract eye-tracking data
+            # extract eye-tracking data
             chunked_df = chunk_data(df_all=exa_df, b_frame=start_frame, e_frame=end_frame)
-            
-            # Generate the heatmap and get the histogram
-            hist = plot_norm_data(sub, run, chunk_num, chunked_df, sigma=sigma, output_path=output_dir)
-            patterns[chunk_num - 1, :] = plot_norm_data(sub, run, chunk_num, chunked_df, sigma=sigma, output_path=output_dir).squeeze()
 
+            # preproc. for time series analysis
+            time_patterns[chunk_num - 1, :] = downsample(chunked_df, resample_to=resample_rate)
+
+            # gen. heatmap and get the histogram
+            spatial_patterns[chunk_num - 1, :] = plot_norm_data(sub, run, chunk_num, chunked_df, sigma=sigma, output_path=output_dir).squeeze()
+
+        # TODO: get rid off redundancies
         descs = {"sub": sub, "task": "study_face_tracks"}
-        model_dataset = Dataset(
-            measurements=patterns,
+        time_dataset = Dataset(
+            measurements=spatial_patterns,
             descriptors=descs,
             obs_descriptors=dict(
                 run=np.repeat(int(run), len(event_labels.values)),
@@ -137,22 +154,53 @@ for sub in sub_list:
             )
         )
 
-        model_rdm = calc_rdm_unbalanced(
-            dataset=model_dataset,
+        # TODO: use proper CV with diff. runs
+        time_rdm = calc_rdm_unbalanced(
+            dataset=time_dataset,
             method="crossnobis",
             descriptor="condition",
             # cv_descriptor="run" # wieder anmachen?
         )
 
-        model_rdm.save(os.path.join(output_dir, f"sub-{sub}_eye-RDM.hdf5"))
-        # fig, _, _ = show_rdm(model_rdm, show_colorbar='panel')
-        # plt.show()
+        time_rdm.save(os.path.join(output_dir, f"sub-{sub}_eye-time-RDM.hdf5"))
 
-in_fpaths = glob.glob("/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks/sub*/*.hdf5")
+        # descs = {"sub": sub, "task": "study_face_tracks"}
+        # spatial_dataset = Dataset(
+        #     measurements=spatial_patterns,
+        #     descriptors=descs,
+        #     obs_descriptors=dict(
+        #         run=np.repeat(int(run), len(event_labels.values)),
+        #         condition=event_labels.values
+        #     )
+        # )
+
+        # spatial_rdm = calc_rdm_unbalanced(
+        #     dataset=spatial_dataset,
+        #     method="crossnobis",
+        #     descriptor="condition",
+        #     # cv_descriptor="run" # wieder anmachen?
+        # )
+
+        # spatial_rdm.save(os.path.join(output_dir, f"sub-{sub}_eye-RDM.hdf5"))
+        # # fig, _, _ = show_rdm(model_rdm, show_colorbar='panel')
+        # # plt.show()
+
+# TODO: fix red. here aswell
+in_fpaths = glob.glob("/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks/sub*/*_eye-time-RDM.hdf5")
 rdms_list = [load_rdm(file_path) for file_path in in_fpaths]
-general_model = concat(rdms_list)
+general_time_model = concat(rdms_list)
 
-fig, _, _ = show_rdm(general_model, show_colorbar='panel')
+fig, _, _ = show_rdm(general_time_model, show_colorbar='panel')
 plt.show()
 
-general_model.save(os.path.join("/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks", f"general_eye-RDM.hdf5"))
+general_time_model.save(os.path.join("/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks", f"general-time_eye-RDM.hdf5"))
+
+# # spatial
+# in_fpaths = glob.glob("/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks/sub*/*_eye-RDM.hdf5")
+# rdms_list = [load_rdm(file_path) for file_path in in_fpaths]
+# general_model = concat(rdms_list)
+
+# fig, _, _ = show_rdm(general_model, show_colorbar='panel')
+# plt.show()
+
+# general_model.save(os.path.join("/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks", f"general_eye-RDM.hdf5"))
