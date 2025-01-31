@@ -129,7 +129,7 @@ for sub in sub_list:
         print(f"Processing sub-{sub} run-{run}: {len(steps_list)} chunks")
 
         # initialize empty arrays
-        spatial_patterns, time_patterns = np.full([len(steps_list), 698880], np.nan), np.full([len(steps_list), 600], np.nan)
+        spatial_patterns, time_patterns = np.full([len(steps_list), 698880], np.nan), np.full([len(steps_list), resample_rate*2], np.nan)
 
         for chunk_num, ((start_frame, end_frame), label) in enumerate(zip(steps_list, event_labels), start=1):
             print(f"Chunk-{chunk_num}; Start frame: {start_frame}, End frame: {end_frame}")
