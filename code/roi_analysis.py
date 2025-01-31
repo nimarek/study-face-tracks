@@ -15,6 +15,9 @@ from rsatoolbox.vis import plot_model_comparison
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+import warnings
+warnings.simplefilter("ignore", UserWarning)
+
 # I/O
 sub_list = ["01", "02", "03", "04", "06", "10", "14", "15", "16", "17", "18", "19", "20"]
 orientations = ["frontal", "left", "right"]
@@ -31,7 +34,7 @@ if not os.path.exists(out_dir_nRDM):
 
 # housekeeping
 rdm_list = []
-lut_fpath = "/home/exp-psy/Desktop/study_face_tracks/derivatives/fmriprep_native/desc-aparcaseg_dseg.tsv"
+lut_fpath = "/home/exp-psy/Desktop/study_face_tracks/derivatives/fmriprep_mni/desc-aparcaseg_dseg.tsv"
 lut_df = pd.read_csv(lut_fpath, sep="\t")
 
 # create dist. matrix values
@@ -44,33 +47,23 @@ def custom_distance(x, y):
         return 1
 
 # define lists of labels to keep
-cortical_rois = [f"ctx-{h}-{region}" for h in ["lh", "rh"] for region in [
-    "bankssts", "caudalanteriorcingulate", "caudalmiddlefrontal", "cuneus",
-    "entorhinal", "fusiform", "inferiorparietal", "inferiortemporal", "insula",
-    "isthmuscingulate", "lateraloccipital", "lateralorbitofrontal", "lingual",
-    "medialorbitofrontal", "middletemporal", "parahippocampal", "paracentral",
-    "parsopercularis", "parsorbitalis", "parstriangularis", "pericalcarine",
-    "postcentral", "posteriorcingulate", "precentral", "precuneus",
-    "rostralanteriorcingulate", "rostralmiddlefrontal", "superiorfrontal",
-    "superiorparietal", "superiortemporal", "supramarginal", "frontalpole",
-    "temporalpole", "transversetemporal", "V1", "V2", "V3", "V4", "MT",
-    "MST", "LO", "LIP", "VIP", "FEF", "PPC", "SPL", "IPL", "IFG", "DLPFC",
-    "ACC", "PCC", "SMA", "PMC", "TPJ"
-]]
+# cortical_rois = [f"ctx-{h}-{region}" for h in ["lh", "rh"] for region in [
+
+#     "cuneus", 
+# ]]
 
 subcortical_rois = [
-    "Left-Thalamus-Proper", "Right-Thalamus-Proper", "Left-Caudate", "Right-Caudate",
-    "Left-Putamen", "Right-Putamen", "Left-Pallidum", "Right-Pallidum",
-    "Left-Hippocampus", "Right-Hippocampus", "Left-Amygdala", "Right-Amygdala",
-    "Left-Accumbens-area", "Right-Accumbens-area", "Left-VentralDC", "Right-VentralDC",
-    "Brain-Stem", "Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex",
-    "Left-Cerebellum-White-Matter", "Right-Cerebellum-White-Matter",
-    "Subthalamic-Nucleus", "Zona-Incerta", "Red-Nucleus", "Substantia-Nigra"
+    "Left-Thalamus-Proper", "Right-Thalamus-Proper",
+    "Left-Caudate", "Right-Caudate",
+    "Left-Putamen", "Right-Putamen",
+    "Left-Pallidum", "Right-Pallidum",
+    "Left-Hippocampus", "Right-Hippocampus",
+    "Left-Amygdala", "Right-Amygdala",
+    "Left-Accumbens-area", "Right-Accumbens-area"
 ]
 
-
 # combine cortical and subcortical ROIs
-rois_of_interest = cortical_rois + subcortical_rois
+rois_of_interest = subcortical_rois
 filtered_data = lut_df[lut_df["name"].isin(rois_of_interest)]
 
 for roi in filtered_data["name"]:
@@ -79,18 +72,17 @@ for roi in filtered_data["name"]:
     match_index = matches["index"].values[0]
 
     for sub in sub_list:
-        print(f"running sub-{sub} ...")
         aparc_fpath = os.path.join(
             "/home", 
             "exp-psy", 
             "Desktop", 
             "study_face_tracks", 
             "derivatives", 
-            "fmriprep_native",
+            "fmriprep_mni",
             f"sub-{sub}", 
             "ses-movie", 
             "func", 
-            f"sub-{sub}_ses-movie_task-movie_run-1_space-T1w_desc-aparcaseg_dseg.nii.gz"
+            f"sub-{sub}_ses-movie_task-movie_run-1_space-MNI152NLin2009cAsym_res-2_desc-aparcaseg_dseg.nii.gz"
         )
         
         aparc_data = load_img(aparc_fpath).get_fdata()
@@ -109,9 +101,10 @@ for roi in filtered_data["name"]:
                     "Desktop", 
                     "study_face_tracks", 
                     "derivatives", 
-                    "lss_native_smooth-3_face-tracks", 
+                    "hyperalignment", 
                     f"sub-{sub}", 
-                    f"sub-{sub}_run-*_contrast-*.nii.gz")
+                    f"roi-{roi}", 
+                    f"sub-{sub}*t-map.nii.gz")
             )
         )
 
@@ -125,7 +118,6 @@ for roi in filtered_data["name"]:
         runs = [path.split("/")[-1].split("_")[1].split("-")[1] for path in nifti_fpaths]
 
         # create distance matrix
-        print("creating hypothesis matrices ...")
         orientation_matrix = np.zeros((len(orientations), len(orientations)))
 
         for i, label1 in enumerate(orientations):
@@ -178,7 +170,6 @@ for roi in filtered_data["name"]:
     models_comp = []
 
     for model, model_name in zip(models_in, model_names):
-        print(f"Processing model: {model_name}")
         models_comp.append(ModelFixed(model_name, model))
 
     # call function for evaluation
@@ -187,7 +178,7 @@ for roi in filtered_data["name"]:
     np.save(os.path.join(out_dir_roi, f"roi-{roi}.npy"), results)
 
     # plot model
-    plot_model_comparison(results, sort=True)
+    plot_model_comparison(results, sort=False)
     plt.savefig(os.path.join(out_dir_roi, f"roi-{roi}.png"), dpi=300)
 
     # clear list obj
