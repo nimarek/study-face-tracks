@@ -1,5 +1,6 @@
 import os
 import glob
+import itertools
 import numpy as np
 import pandas as pd
 from sklearn.utils import resample
@@ -20,7 +21,7 @@ rdm_list = []
 # Lists for subjects, runs, and chunks
 chunk_list = [0, 59, 68, 55, 71, 54, 68, 83, 51]
 sub_list = ["01", "02", "03", "04", "05", "06", "09", "10", "14", "15", "16", "17", "18", "19", "20"]
-run_list = ["01"]
+run_list = ["01", "02"]
 
 # helper functions
 def create_dirs(sub):
@@ -44,34 +45,39 @@ def load_split(sub, root_dir):
     df_all["frame"] = df_movie_frame
     return df_all
 
-def load_events(run):
+def load_events(run_list):
     """
     Load event files and use them as onsets and durations to slice the eye-movement data.
     Converts onsets and durations from seconds to frames for a movie presented at 25 fps.
     """
-    event_path = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/reference_face-tracks/studyf_run-{run}_face-orientation.csv"
-    tmp_df = pd.read_csv(event_path, delimiter=",")
+    tmp_list, tmp_events, run_ident = [], [], []
+    for run in run_list:
+        event_path = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/reference_face-tracks/studyf_run-{run}_face-orientation.csv"
+        tmp_df = pd.read_csv(event_path, delimiter=",")
 
-    keywords = ["frontal", "right", "left"]
+        keywords = ["frontal", "right", "left"]
 
-    # pre-process dataframe
-    tmp_df = tmp_df[
-        tmp_df["trial_type"].apply(lambda x: sum(x.count(keyword) for keyword in keywords) == 1)
-    ]
-    tmp_df["trial_type"] = tmp_df["trial_type"].str.replace(r"-\d+$", "", regex=True)
+        # pre-process dataframe
+        tmp_df = tmp_df[
+            tmp_df["trial_type"].apply(lambda x: sum(x.count(keyword) for keyword in keywords) == 1)
+        ]
+        tmp_df["trial_type"] = tmp_df["trial_type"].str.replace(r"-\d+$", "", regex=True)
 
-    # Convert onset and duration from seconds to frames
-    tmp_df["onset"] = tmp_df["onset"] * 25  
-    tmp_df["duration"] = tmp_df["duration"] * 25  
-    tmp_df["offset"] = tmp_df["onset"] + tmp_df["duration"]
-    return list(zip(tmp_df["onset"].astype(int), tmp_df["offset"].astype(int))), tmp_df["trial_type"]
+        # Convert onset and duration from seconds to frames
+        tmp_df["onset"] = tmp_df["onset"] * 25  
+        tmp_df["duration"] = tmp_df["duration"] * 25  
+        tmp_df["offset"] = tmp_df["onset"] + tmp_df["duration"]
+        tmp_list.append(zip(tmp_df["onset"].astype(int), tmp_df["offset"].astype(int)))
+        tmp_events.append(tmp_df["trial_type"])
+        run_ident.append(np.repeat(int(run), len(tmp_df["trial_type"])))
+    return list(itertools.chain(*tmp_list)), list(itertools.chain(*tmp_events)), list(itertools.chain(*run_ident))
 
 def chunk_data(df_all, b_frame, e_frame):
     """Extract a chunk of eye-tracking data based on frame range."""
     chunked_df = df_all.loc[(df_all["frame"] >= b_frame) & (df_all["frame"] <= e_frame)]
     return chunked_df
 
-def plot_norm_data(sub, run, chunk, chunk_data, sigma=None, output_path="/home/exp-psy/Desktop/study_face_tracks"):
+def plot_norm_data(chunk_data, sigma=None):
     """
     Generate fixation density maps and save them to disk.
     """
@@ -89,118 +95,51 @@ def plot_norm_data(sub, run, chunk, chunk_data, sigma=None, output_path="/home/e
 
     # Smooth the histogram
     hist = gaussian_filter(hist, sigma=sigma)
-
-    # Plot heatmap
-    fig, ax = plt.subplots(constrained_layout=True)
-    im = ax.imshow(
-        hist,
-        aspect="equal",
-        cmap="Blues",
-        origin="upper",
-        alpha=1,
-        extent=extent
-    )
-    
-    save_path = os.path.join(output_path, f"sub-{sub}_run-{run}_scene-{chunk}.png")
-    plt.axis("off")
-    plt.savefig(save_path, bbox_inches="tight", pad_inches=0)
-    plt.close()
     return hist.flatten()
-
-def downsample(chunked_df, resample_to=250):
-    """
-    Convert pandas df to numpy arrays and mask all nan values and remove from dataframe.
-    """
-    raw_x, raw_y = chunked_df["x"], chunked_df["y"]
-    pros_x, pros_y = raw_x[~np.isnan(raw_x)], raw_y[~np.isnan(raw_y)]
-
-    if pros_x.size == 0:
-        res_x, res_y = [0], [0]
-    else:
-        res_x, res_y = resample(pros_x, replace=True, n_samples=resample_to, random_state=0), resample(pros_y, replace=True, n_samples=resample_to, random_state=0)
-    return np.concatenate((res_x, res_y), axis=None)
 
 for sub in sub_list:
     output_dir = create_dirs(sub)
     exa_df = load_split(sub, root_dir=eye_raw_dir)
+    steps_list, event_labels, run_identifier = load_events(run_list)
 
-    for run in run_list:
-        steps_list, event_labels = load_events(run)
-        print(f"Processing sub-{sub} run-{run}: {len(steps_list)} chunks")
+    print(f"Processing sub-{sub}: {len(steps_list)} chunks")
 
-        # initialize empty arrays
-        spatial_patterns, time_patterns = np.full([len(steps_list), 698880], np.nan), np.full([len(steps_list), resample_rate*2], np.nan)
+    # initialize empty arrays
+    spatial_patterns = np.full([len(steps_list), 698880], np.nan)
 
-        for chunk_num, ((start_frame, end_frame), label) in enumerate(zip(steps_list, event_labels), start=1):
-            print(f"Chunk-{chunk_num}; Start frame: {start_frame}, End frame: {end_frame}")
-            
-            # extract eye-tracking data
-            chunked_df = chunk_data(df_all=exa_df, b_frame=start_frame, e_frame=end_frame)
+    for chunk_num, ((start_frame, end_frame), label) in enumerate(zip(steps_list, event_labels), start=1):
+        # extract eye-tracking data
+        chunked_df = chunk_data(df_all=exa_df, b_frame=start_frame, e_frame=end_frame)
 
-            # preproc. for time series analysis
-            time_patterns[chunk_num - 1, :] = downsample(chunked_df, resample_to=resample_rate)
+        # gen. heatmap and get the histogram
+        spatial_patterns[chunk_num - 1, :] = plot_norm_data(chunked_df, sigma=sigma).squeeze()
 
-            # gen. heatmap and get the histogram
-            spatial_patterns[chunk_num - 1, :] = plot_norm_data(sub, run, chunk_num, chunked_df, sigma=sigma, output_path=output_dir).squeeze()
-
-        # TODO: get rid off redundancies
-        descs = {"sub": sub, "task": "study_face_tracks"}
-        time_dataset = Dataset(
-            measurements=spatial_patterns,
-            descriptors=descs,
-            obs_descriptors=dict(
-                run=np.repeat(int(run), len(event_labels.values)),
-                condition=event_labels.values
-            )
+    descs = {"sub": sub, "task": "study_face_tracks"}
+    spatial_dataset = Dataset(
+        measurements=spatial_patterns,
+        descriptors=descs,
+        obs_descriptors=dict(
+            run=run_identifier,
+            condition=event_labels
         )
+    )
 
-        # TODO: use proper CV with diff. runs
-        time_rdm = calc_rdm_unbalanced(
-            dataset=time_dataset,
-            method="crossnobis",
-            descriptor="condition",
-            # cv_descriptor="run" # wieder anmachen?
-        )
+    spatial_rdm = calc_rdm_unbalanced(
+        dataset=spatial_dataset,
+        method="crossnobis",
+        descriptor="condition",
+        cv_descriptor="run"
+    )
+    spatial_rdm.save(os.path.join(output_dir, f"sub-{sub}_eye-RDM.hdf5"))
+    # # fig, _, _ = show_rdm(model_rdm, show_colorbar="panel")
+    # # plt.show()
 
-        time_rdm.save(os.path.join(output_dir, f"sub-{sub}_eye-time-RDM.hdf5"))
-
-        # descs = {"sub": sub, "task": "study_face_tracks"}
-        # spatial_dataset = Dataset(
-        #     measurements=spatial_patterns,
-        #     descriptors=descs,
-        #     obs_descriptors=dict(
-        #         run=np.repeat(int(run), len(event_labels.values)),
-        #         condition=event_labels.values
-        #     )
-        # )
-
-        # spatial_rdm = calc_rdm_unbalanced(
-        #     dataset=spatial_dataset,
-        #     method="crossnobis",
-        #     descriptor="condition",
-        #     # cv_descriptor="run" # wieder anmachen?
-        # )
-
-        # spatial_rdm.save(os.path.join(output_dir, f"sub-{sub}_eye-RDM.hdf5"))
-        # # fig, _, _ = show_rdm(model_rdm, show_colorbar='panel')
-        # # plt.show()
-
-# TODO: fix red. here aswell
-in_fpaths = glob.glob("/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks/sub*/*_eye-time-RDM.hdf5")
+# spatial
+in_fpaths = glob.glob("/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks/sub*/*_eye-RDM.hdf5")
 rdms_list = [load_rdm(file_path) for file_path in in_fpaths]
-general_time_model = concat(rdms_list)
+general_model = concat(rdms_list)
 
-fig, _, _ = show_rdm(general_time_model, show_colorbar='panel')
+fig, _, _ = show_rdm(general_model, show_colorbar="panel")
 plt.show()
 
-general_time_model.save(os.path.join("/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks", f"general-time_eye-RDM.hdf5"))
-
-# # spatial
-# in_fpaths = glob.glob("/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks/sub*/*_eye-RDM.hdf5")
-# rdms_list = [load_rdm(file_path) for file_path in in_fpaths]
-# general_model = concat(rdms_list)
-
-# fig, _, _ = show_rdm(general_model, show_colorbar='panel')
-# plt.show()
-
-# general_model.save(os.path.join("/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks", f"general_eye-RDM.hdf5"))
+general_model.save(os.path.join("/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks", f"general_eye-RDM.hdf5"))
