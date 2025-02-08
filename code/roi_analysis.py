@@ -15,8 +15,8 @@ from rsatoolbox.vis import plot_model_comparison
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-import warnings
-warnings.simplefilter("ignore", UserWarning)
+# import warnings
+# warnings.simplefilter("ignore", UserWarning)
 
 # I/O
 sub_list = ["01", "02", "03", "04", "06", "10", "14", "15", "16", "17", "18", "19", "20"]
@@ -24,13 +24,9 @@ orientations = ["frontal", "left", "right"]
 eye_fpath = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/eye_tracks"
 vis_fpath = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/model_rdms/visual_properties"
 
-out_dir_roi = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/roi-results/"
+out_dir_roi = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/roi-results_mni/"
 if not os.path.exists(out_dir_roi):
     os.makedirs(out_dir_roi, exist_ok=True)
-
-out_dir_nRDM = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/roi-neural-RDM/"
-if not os.path.exists(out_dir_nRDM):
-    os.makedirs(out_dir_nRDM, exist_ok=True)
 
 # housekeeping
 rdm_list = []
@@ -47,10 +43,17 @@ def custom_distance(x, y):
         return 1
 
 # define lists of labels to keep
-# cortical_rois = [f"ctx-{h}-{region}" for h in ["lh", "rh"] for region in [
-
-#     "cuneus", 
-# ]]
+cortical_rois = [f"ctx-{h}-{region}" for h in ["lh", "rh"] for region in [
+    "bankssts", "caudalanteriorcingulate", "caudalmiddlefrontal", "cuneus",
+    "entorhinal", "fusiform", "inferiorparietal", "inferiortemporal",
+    "insula", "isthmuscingulate", "lateraloccipital", "lateralorbitofrontal",
+    "lingual", "medialorbitofrontal", "middletemporal", "parahippocampal",
+    "paracentral", "parsopercularis", "parsorbitalis", "parstriangularis",
+    "pericalcarine", "postcentral", "posteriorcingulate", "precentral",
+    "precuneus", "rostralanteriorcingulate", "rostralmiddlefrontal",
+    "superiorfrontal", "superiorparietal", "superiortemporal",
+    "supramarginal", "frontalpole", "temporalpole", "transversetemporal"
+]]
 
 subcortical_rois = [
     "Left-Thalamus-Proper", "Right-Thalamus-Proper",
@@ -61,9 +64,8 @@ subcortical_rois = [
     "Left-Amygdala", "Right-Amygdala",
     "Left-Accumbens-area", "Right-Accumbens-area"
 ]
-
 # combine cortical and subcortical ROIs
-rois_of_interest = subcortical_rois
+rois_of_interest = cortical_rois
 filtered_data = lut_df[lut_df["name"].isin(rois_of_interest)]
 
 for roi in filtered_data["name"]:
@@ -101,10 +103,9 @@ for roi in filtered_data["name"]:
                     "Desktop", 
                     "study_face_tracks", 
                     "derivatives", 
-                    "hyperalignment", 
+                    "lss_mni_smooth-2_face-tracks", 
                     f"sub-{sub}", 
-                    f"roi-{roi}", 
-                    f"sub-{sub}*t-map.nii.gz")
+                    f"sub-{sub}*beta-map.nii.gz")
             )
         )
 
@@ -154,7 +155,7 @@ for roi in filtered_data["name"]:
                 dataset=ds,
                 method="crossnobis",
                 descriptor="condition",
-                # cv_descriptor="run" # wieder anmachen?
+                cv_descriptor="run"
             )
         )
 
@@ -164,9 +165,10 @@ for roi in filtered_data["name"]:
 
     models_in = [orientation_matrix, 
                  load_rdm(os.path.join(eye_fpath, "general_eye-RDM.hdf5")), 
-                 load_rdm(os.path.join(vis_fpath, "visual-RDM.hdf5"))]
+                 # load_rdm(os.path.join(vis_fpath, "visual-RDM.hdf5"))
+                 ]
     
-    model_names = ["face orientation", "FDM", "image similarity"]
+    model_names = ["face orientation", "FDM"] # ,  "image similarity"
     models_comp = []
 
     for model, model_name in zip(models_in, model_names):
