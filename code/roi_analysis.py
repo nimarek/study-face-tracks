@@ -15,8 +15,8 @@ from rsatoolbox.vis import plot_model_comparison
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# import warnings
-# warnings.simplefilter("ignore", UserWarning)
+import warnings
+warnings.simplefilter("ignore", UserWarning)
 
 # I/O
 sub_list = ["01", "02", "03", "04", "06", "10", "14", "15", "16", "17", "18", "19", "20"]
@@ -94,7 +94,21 @@ for roi in filtered_data["name"]:
         target_mask[aparc_data == float(match_index)] = True
         roi_size = target_mask.sum()
 
-        # create obj. to store data
+        # # create obj. to store data
+        # nifti_fpaths = natsorted(
+        #     glob.glob(
+        #         os.path.join(
+        #             "/home", 
+        #             "exp-psy", 
+        #             "Desktop", 
+        #             "study_face_tracks", 
+        #             "derivatives", 
+        #             "lss_mni_smooth-2_face-tracks", 
+        #             f"sub-{sub}", 
+        #             f"sub-{sub}*beta-map.nii.gz")
+        #     )
+        # )
+
         nifti_fpaths = natsorted(
             glob.glob(
                 os.path.join(
@@ -103,8 +117,9 @@ for roi in filtered_data["name"]:
                     "Desktop", 
                     "study_face_tracks", 
                     "derivatives", 
-                    "lss_mni_smooth-2_face-tracks", 
+                    "hyperalignment", 
                     f"sub-{sub}", 
+                    f"roi-{roi}", 
                     f"sub-{sub}*beta-map.nii.gz")
             )
         )
@@ -182,6 +197,7 @@ for roi in filtered_data["name"]:
     # plot model
     plot_model_comparison(results, sort=False)
     plt.savefig(os.path.join(out_dir_roi, f"roi-{roi}.png"), dpi=300)
-
+    plt.close()
+    
     # clear list obj
     rdm_list.clear()
