@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import glob
 import pandas as pd
 import numpy as np
 import nibabel as nib
@@ -11,9 +12,9 @@ from nltools.stats import align, zscore
 # I/O
 sub = str(sys.argv[1])
 all_data = []
-target_run, train_run = 1, 7
+target_run, train_run = 2, 7
 sub_list = ["01", "02", "03", "04", "06", "10", "14", "15", "16", "17", "18", "19", "20"]
-event_file = "/home/exp-psy/Desktop/study_face_tracks/derivatives/reference_face-tracks/studyf_run-01_face-orientation.csv"
+event_file = f"/home/exp-psy/Desktop/study_face_tracks/derivatives/reference_face-tracks/studyf_run-0{target_run}_face-orientation.csv"
 deriv_dir = "/home/exp-psy/Desktop/study_face_tracks/derivatives/"
 lut_df = pd.read_csv("/home/exp-psy/Desktop/study_face_tracks/derivatives/fmriprep_mni/desc-aparcaseg_dseg.tsv", sep="\t")
 
@@ -72,15 +73,7 @@ def reorder_columns(df):
 
 # define lists of labels to keep
 cortical_rois = [f"ctx-{h}-{region}" for h in ["lh", "rh"] for region in [
-    "bankssts", "caudalanteriorcingulate", "caudalmiddlefrontal", "cuneus",
-    "entorhinal", "fusiform", "inferiorparietal", "inferiortemporal",
-    "insula", "isthmuscingulate", "lateraloccipital", "lateralorbitofrontal",
-    "lingual", "medialorbitofrontal", "middletemporal", "parahippocampal",
-    "paracentral", "parsopercularis", "parsorbitalis", "parstriangularis",
-    "pericalcarine", "postcentral", "posteriorcingulate", "precentral",
-    "precuneus", "rostralanteriorcingulate", "rostralmiddlefrontal",
-    "superiorfrontal", "superiorparietal", "superiortemporal",
-    "supramarginal", "frontalpole", "temporalpole", "transversetemporal"
+"temporalpole", "transversetemporal"
 ]]
 
 subcortical_rois = [
@@ -94,22 +87,26 @@ subcortical_rois = [
 ]
 
 # combine cortical and subcortical ROIs
-rois_of_interest = cortical_rois + subcortical_rois
+rois_of_interest = cortical_rois#+ subcortical_rois
 filtered_data = lut_df[lut_df["name"].isin(rois_of_interest)]
 
 for roi in filtered_data["name"]:
     print(f"working on roi: {roi}")
     matches = lut_df[lut_df["name"] == roi]
     match_index = matches["index"].values[0]
-
+ 
     # create output folder
     out_dir = os.path.join(deriv_dir, "hyperalignment", f"sub-{sub}", f"roi-{roi}")
     if not os.path.exists(out_dir):
         os.makedirs(out_dir, exist_ok=True)
-    else:
-        print(f"path exists: {out_dir}")
-        continue
+    # else:
+    #     print(f"path exists: {out_dir}")
+    #     continue
 
+    if len(glob.glob(os.path.join(out_dir, "*"))) == 178:
+        print("folder is already finished, skipping ...")
+        continue
+    
     # start loading data
     for sub_train in sub_list:
         aparc_fpath = os.path.join(
@@ -153,29 +150,29 @@ for roi in filtered_data["name"]:
     # start least-square separate estimation
     print(f"extracting data from subject: {sub}")
     aparc_fpath = os.path.join(
-    "/home", 
-    "exp-psy", 
-    "Desktop", 
-    "study_face_tracks", 
-    "derivatives", 
-    "fmriprep_mni",
-    f"sub-{sub}", 
-    "ses-movie", 
-    "func", 
-    f"sub-{sub}_ses-movie_task-movie_run-{target_run}_space-MNI152NLin2009cAsym_res-2_desc-aparcaseg_dseg.nii.gz"
+        "/home", 
+        "exp-psy", 
+        "Desktop", 
+        "study_face_tracks", 
+        "derivatives", 
+        "fmriprep_mni",
+        f"sub-{sub}", 
+        "ses-movie", 
+        "func", 
+        f"sub-{sub}_ses-movie_task-movie_run-{target_run}_space-MNI152NLin2009cAsym_res-2_desc-aparcaseg_dseg.nii.gz"
     )
 
     func_f = os.path.join(
-    "/home", 
-    "exp-psy", 
-    "Desktop", 
-    "study_face_tracks", 
-    "derivatives", 
-    "fmriprep_mni",
-    f"sub-{sub}", 
-    "ses-movie", 
-    "func", 
-    f"sub-{sub}_ses-movie_task-movie_run-{target_run}_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz"
+        "/home", 
+        "exp-psy", 
+        "Desktop", 
+        "study_face_tracks", 
+        "derivatives", 
+        "fmriprep_mni",
+        f"sub-{sub}", 
+        "ses-movie", 
+        "func", 
+        f"sub-{sub}_ses-movie_task-movie_run-{target_run}_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz"
     )
 
     affine = nib.load(aparc_fpath).affine 
@@ -218,8 +215,11 @@ for roi in filtered_data["name"]:
         lss_df = events.copy()
         trial_type = row["Stim"]
 
-        out_fname_t = os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}_t-map.nii.gz")        
+        #out_fname_t = os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}_t-map.nii.gz")
         out_fname_beta = os.path.join(out_dir, f"sub-{sub}_run-{target_run}_contrast-{trial_type}_beta-map.nii.gz")
+        if os.path.exists(out_fname_beta):
+            print("skip")
+            continue
 
         print("working on stimulus:\t", trial_type)
         
@@ -238,5 +238,5 @@ for roi in filtered_data["name"]:
         smoothed = aligned_sub_hyperalignment["transformed"].smooth(fwhm=3)
         smoothed.X = dm_conv_filt_poly_cov
         stats = smoothed.regress()
-        stats["t"][0].write(out_fname_t)
+        # stats["t"][0].write(out_fname_t)
         stats["beta"][0].write(out_fname_beta)
