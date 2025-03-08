@@ -1,17 +1,11 @@
 #!/bin/bash
 
-# Define the output log file
 log_file="missing_files_log.txt"
-# Clear the log file if it exists
 > "$log_file"
 
-# Define the base directory
 base_dir="/home/exp-psy/Desktop/study_face_tracks/derivatives/hyperalignment"
-
-# Define the list of subject IDs
 sub_list=("01" "02" "03" "04" "06" "10" "14" "15" "16" "17" "18" "19" "20")
 
-# Define the list of ROIs
 ROIS=(
     ctx-lh-bankssts ctx-rh-bankssts
     ctx-lh-caudalanteriorcingulate ctx-rh-caudalanteriorcingulate
@@ -39,17 +33,14 @@ ROIS=(
     ctx-lh-precentral ctx-rh-precentral
 )
 
-# Loop over each subject and ROI
 for sub in "${sub_list[@]}"; do
     for roi in "${ROIS[@]}"; do
         folder="$base_dir/sub-${sub}/roi-${roi}"
         
-        # Check if the directory exists
         if [ -d "$folder" ]; then
             file_count=$(find "$folder" -type f -name "*t-map*.nii.gz" | wc -l)
             echo "Checking $folder - Found $file_count files"
             
-            # Check file count
             if [ "$file_count" -ne 116 ]; then
                 echo "WARNING: Folder $folder has $file_count files instead of 116."
                 echo "$folder" >> "$log_file"
